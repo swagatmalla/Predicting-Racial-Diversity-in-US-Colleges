@@ -1,0 +1,132 @@
+---
+title: "Tidying"
+output: pdf_document
+editor_options:
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+collegeAdmission <- read_csv("~/Stats 272 F22/Project/Group 7A: Swagat, Zoe, Maya/CollegeAdmissions.csv")
+```
+
+```{r}
+#Getting the right vars and renaming
+cleanedDf <- collegeAdmission[c(1, 33, 38, 41, 42, 43, 44, 49, 97, 64:72, 74, 100, 103)] # 8, 10, 12)] 
+cleanedDf <- cleanedDf[c(1,8,9, 2:7, 10:21)]
+
+
+cleanedDf <- rename(cleanedDf, 
+       undergradEnrollment = `Undergraduate enrollment`,
+       freshmenFinAidPercent = `Percent of freshmen receiving any financial aid` ,
+        tuitionFees2013_14 = `Tuition and fees, 2013-14`, 
+       geographicRegion = `Geographic region`, 
+       control = `Control of institution`, 
+       HBCU = `Historically Black College or University`, 
+       degreeUrbanization = `Degree of urbanization (Urban-centric locale)`, 
+       perc_AmericanIndianAlaskaNative = `Percent of undergraduate enrollment that are American Indian or Alaska Native`, 
+       perc_Asian = `Percent of undergraduate enrollment that are Asian`, 
+       perc_BlackAfricanAmerican = `Percent of undergraduate enrollment that are Black or African American`, 
+       perc_HispanicLatino = `Percent of undergraduate enrollment that are Hispanic/Latino`, 
+       perc_NativeHawaiian_OtherPacificIslander = `Percent of undergraduate enrollment that are Native Hawaiian or Other Pacific Islander` , 
+       perc_White = `Percent of undergraduate enrollment that are White` , 
+       perc_MutiRacial = `Percent of undergraduate enrollment that are two or more races` , 
+       perc_RaceUnknown = `Percent of undergraduate enrollment that are Race/ethnicity unknown` , 
+       perc_NonresidentAlien = `Percent of undergraduate enrollment that are Nonresident Alien`, 
+       perc_Women = `Percent of undergraduate enrollment that are women`,
+       perc_FreshmenPellGrants = `Percent of freshmen receiving Pell grants`, 
+       perc_FreshmenInstGrantAid = `Percent of freshmen receiving institutional grant aid`, 
+     #  SATMath75 = `SAT Math 75th percentile score`, 
+      # SATReading75 = `SAT Critical Reading 75th percentile score`, 
+       #SATWriting75 = `SAT Writing 75th percentile score`
+       )
+
+```
+
+```{r}
+#mutating the variables we need
+cleanedDf <-cleanedDf %>%
+  mutate(
+    numPOC = 
+      (perc_AmericanIndianAlaskaNative/100 + 
+         perc_Asian/100 + 
+         perc_BlackAfricanAmerican/100 + 
+         perc_HispanicLatino/100 + 
+         perc_NativeHawaiian_OtherPacificIslander/100 ) * undergradEnrollment, 
+    perc_POC = 
+      numPOC/undergradEnrollment*100,
+    
+    numWhite = perc_White/100 * undergradEnrollment,
+  #  SATReading75_10 = SATReading75/10, 
+   # SATWriting75_10 = SATWriting75/10,
+  #  SATMath75_10 = SATMath75/10
+  )
+
+cleanedDf <- cleanedDf %>%
+  mutate(tuition1000Dollar = tuitionFees2013_14/1000,#Transform tuition into 1000's of dollars
+         controlPublic = ifelse(control == 'Public', 1, 0), 
+         HBCUYes = ifelse(HBCU == 'Yes', 1, 0)
+         ) 
+```
+
+There are a lot of levels for degree of urbanization, so condensing them might be easier for interpretation and regression. 
+```{r}
+#condense the categories for degree of urbanization
+cleanedDf <- cleanedDf %>%
+  mutate(
+    degreeUrbanization = ifelse(degreeUrbanization == 'City: Midsize'| degreeUrbanization == 'City: Small'| degreeUrbanization == 'City: Large', 'City', degreeUrbanization), 
+    
+    degreeUrbanization = ifelse(degreeUrbanization == 'Town: Fringe'|
+                                  degreeUrbanization == 'Town: Distant'|
+                                degreeUrbanization == 'Town: Remote', 'Town', degreeUrbanization), 
+    
+     degreeUrbanization = ifelse(degreeUrbanization == 'Rural: Remote'|
+                                  degreeUrbanization == 'Rural: Fringe'|
+                                degreeUrbanization == 'Rural: Distant', 'Rural', degreeUrbanization), 
+    
+    
+    degreeUrbanization = ifelse(degreeUrbanization == 'Suburb: Large'|
+                                  degreeUrbanization == 'Suburb: Small'|
+                                degreeUrbanization == 'Suburb: Midsize', 'Suburb', degreeUrbanization)
+  )
+```
+
+```{r}
+cleanedDf <- cleanedDf %>%
+  mutate(geographicRegion = str_extract(cleanedDf$geographicRegion,  "Far West|Southwest|Rocky Mountains|New England|Mid East|Great Lakes|Plains|Southeast") )
+```
+
+Converting  `geographicRegion` and `degreeUrbanization` into factors will be helpful for creating models with a reference group.
+
+```{r}
+#converting into factors
+cleanedDf <-cleanedDf %>% 
+  mutate(geographicRegion_factor = as_factor(geographicRegion), 
+         degreeUrbanization_factor = as_factor(degreeUrbanization))
+
+#get rid of US Service Schools
+cleanedDf <- cleanedDf%>%
+  filter(geographicRegion != 'US Service schools')
+```
+
+```{r}
+#List all the rows with NA
+cleanedDf[rowSums(is.na(cleanedDf)) > 0, ]
+```
+
+There are missings for variables that are used in the model. They indicate incompleteness, so dropping them makes sense here.
+
+```{r}
+#Deal with NA
+library(dplyr)
+cleanedDf <- anti_join(cleanedDf, cleanedDf[rowSums(is.na(cleanedDf)) > 0, ])
+```
+
+```{r}
+write_csv(cleanedDf, "~/Stats 272 F22/Project/Group 7A: Swagat, Zoe, Maya/cleanedDf.csv")
+```
+
+
